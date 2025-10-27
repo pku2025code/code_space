@@ -1,0 +1,104 @@
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <climits>
+#include <cmath>
+
+using namespace std;
+
+// 优化：原函数逻辑正确，但内部使用位运算，循环次数最多为位数（60次）
+long long find_min_m(long long low, long long mask) {
+    long long m = low;
+    long long missing = mask & ~m;
+    if (missing == 0) return m;
+    while (missing) {
+        long long bit = missing & -missing;  // 取最低设置位
+        long long mask_clear = ~(bit - 1);   // 清除低位掩码
+        m = (m | bit) & mask_clear;         // 设置位并清低位
+        missing = mask & ~m;
+    }
+    return m;
+}
+
+long long solve(long long x, long long y) {
+    if (x == y) return 0;
+    long long min_ops = LLONG_MAX;
+
+    // 优化1：检查仅用操作1的情况
+    for (int k = 0; k <= 60; k++) {
+        long long lower_bound = y * (1LL << k);
+        long long upper_bound = (y + 1) * (1LL << k) - 1;
+        if (x >= lower_bound && x <= upper_bound) {
+            min_ops = min(min_ops, (long long)k);
+        }
+    }
+
+    // 优化2：检查仅用操作2的情况
+    if ((x | y) == y) {
+        min_ops = min(min_ops, 1LL);
+    }
+
+    // 优化3：枚举组合操作，但动态限制b的范围
+    for (int a = 0; a <= 60; a++) {
+        long long x1 = x >> a;
+        if (x1 == 0) {
+            // 处理x1=0的情况：仅当y=0时有效
+            if (y == 0) {
+                min_ops = min(min_ops, (long long)a + 1); // 操作2后无需右移
+            }
+            continue; // x1=0且y≠0时无法得到y，跳过
+        }
+
+        // 动态计算b的最小值b_min
+        int b_min = 0;
+        if (y > 0) {
+            while (b_min <= 60 && (y + 1) * (1LL << b_min) - 1 < x1) {
+                b_min++;
+            }
+        } else {
+            // y=0时，需满足2^b > x1
+            while (b_min <= 60 && (1LL << b_min) - 1 < x1) {
+                b_min++;
+            }
+        }
+        if (b_min > 60) continue; // 无解
+
+        // 枚举b从b_min到60（避免无效低b值）
+        for (int b = b_min; b <= 60; b++) {
+            long long L = y * (1LL << b);
+            long long U = (y + 1) * (1LL << b) - 1;
+            if (x1 > U) break; // x1过大，后续b更无效，提前退出
+
+            long long low_val = max(x1, L);
+            long long m_val = find_min_m(low_val, x1);
+            if (m_val <= U) {
+                long long ops = a + 1 + b;
+                if (ops < min_ops) {
+                    min_ops = ops;
+                }
+            }
+            // 若当前min_ops已很小，可提前终止（可选优化）
+            if (min_ops <= 2) break;
+        }
+        if (min_ops <= 2) break; // 提前终止外层循环
+    }
+    return min_ops;
+}
+
+int main() {
+    ios_base::sync_with_stdio(false);
+    cin.tie(NULL);
+    
+    int T;
+    cin >> T;
+    vector<long long> results;
+    for (int i = 0; i < T; i++) {
+        long long x, y;
+        cin >> x >> y;
+        results.push_back(solve(x, y));
+    }
+    for (long long res : results) {
+        cout << res << "\n";
+    }
+    return 0;
+}
